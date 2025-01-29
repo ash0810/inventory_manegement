@@ -16,30 +16,6 @@ def fetch_data(query):
     return data
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # データ表示処理
 try:
     # テーブル作成（必要な場合）
@@ -103,22 +79,6 @@ except Exception as e:
 
 
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     
     
     
