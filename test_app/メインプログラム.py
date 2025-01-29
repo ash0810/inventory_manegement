@@ -26,6 +26,10 @@ def sample_done():
 image = Image.open('./pic/databaseImage.jpg')
 st.image(image, width=200)
 
+
+
+
+
 # ポップボタンを表示する
 pop_btn(
     label="ポップボタンをクリック！",  # ボタンのラベル
