@@ -1,3 +1,4 @@
+# pages/料理作成.py
 import streamlit as st
 import sqlite3
 import pandas as pd
@@ -5,10 +6,9 @@ import pandas as pd
 st.title('作るメニューと個数を入力するページ')
 st.caption('消費する材料の個数を計算してデータベースを編集する')
 
-# データベースファイルのパスを指定
-db_path = "C:/zaiko/inventory_manegement/test_app/発注管理.db"  # 保存先のディレクトリを指定
+# データベースファイルのパス（発注管理.db を共通利用）
+db_path = "C:/zaiko/inventory_manegement/test_app/発注管理.db"
 
-# データベース内にテーブルを作成
 def create_ryouri_table():
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
@@ -22,62 +22,71 @@ def create_ryouri_table():
     conn.commit()
     conn.close()
 
-# 作る料理とその個数を入力
-if "ryouri_info_list" not in st.session_state:
-    st.session_state["ryouri_info_list"] = []
+# セッション変数の初期化
+if "ryouri_kinds" not in st.session_state:
+    st.session_state["ryouri_kinds"] = 1
+if "ryouri_inputs" not in st.session_state:
+    st.session_state["ryouri_inputs"] = {}
 
-with st.form(key='ryouri_info'):
-    kinds = st.number_input('料理数', min_value=1, step=1, key="ryouri_kinds")
-    submit_button = st.form_submit_button('料理の登録')
+# ── 料理数入力用フォーム ──
+with st.form(key='ryouri_kinds_form'):
+    kinds = st.number_input('料理数', min_value=1, step=1, value=st.session_state["ryouri_kinds"], key="ryouri_kinds_input")
+    submit_kinds = st.form_submit_button('料理数を登録')
+    if submit_kinds:
+        st.session_state["ryouri_kinds"] = int(kinds)
+        st.experimental_rerun()  # 再描画して動的入力欄を更新
 
-    if submit_button:
-        # 料理数に応じてフォームの入力欄を作成
-        st.session_state["ryouri_info_list"] = []
-        for i in range(int(kinds)):
-            name_key = f"name_{i}"
-            kosuu_key = f"kosuu_{i}"
+# ── 動的入力欄の表示 ──
+for i in range(st.session_state["ryouri_kinds"]):
+    name_key = f"ryouri_name_{i}"
+    qty_key = f"ryouri_quantity_{i}"
+    # 初期値の設定（初回のみ）
+    if name_key not in st.session_state["ryouri_inputs"]:
+        st.session_state["ryouri_inputs"][name_key] = ""
+    if qty_key not in st.session_state["ryouri_inputs"]:
+        st.session_state["ryouri_inputs"][qty_key] = 1
+    st.session_state["ryouri_inputs"][name_key] = st.text_input(f'料理名 {i+1}', 
+                                                                 value=st.session_state["ryouri_inputs"][name_key], 
+                                                                 key=name_key)
+    st.session_state["ryouri_inputs"][qty_key] = st.number_input(f'個数 {i+1}', 
+                                                                  min_value=1, step=1, 
+                                                                  value=st.session_state["ryouri_inputs"][qty_key], 
+                                                                  key=qty_key)
 
-            name = st.text_input(f'料理名 {i+1}', key=name_key)
-            kosuu = st.number_input(f'個数 {i+1}', min_value=1, step=1, key=kosuu_key)
+# ── 料理情報の登録ボタン ──
+if st.button('料理の登録'):
+    ryouri_info_list = []
+    for i in range(st.session_state["ryouri_kinds"]):
+        name = st.session_state.get(f"ryouri_name_{i}")
+        qty = st.session_state.get(f"ryouri_quantity_{i}")
+        if name and qty:
+            ryouri_info_list.append({"name": name, "quantity": qty})
+    if ryouri_info_list:
+        create_ryouri_table()
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        for entry in ryouri_info_list:
+            cursor.execute("""
+                INSERT INTO ryouri (name, quantity)
+                VALUES (?, ?)
+            """, (entry["name"], entry["quantity"]))
+        conn.commit()
+        conn.close()
+        st.success("データがデータベースに保存されました！")
+        st.session_state["ryouri_inputs"] = {}  # 入力欄をリセット
+    else:
+        st.error("料理情報が入力されていません。")
 
-            if name and kosuu:
-                st.session_state["ryouri_info_list"].append({
-                    "name": name,
-                    "quantity": kosuu
-                })
-        
-        if st.session_state["ryouri_info_list"]:
-            # 入力されたデータをデータベースに保存
-            create_ryouri_table()
-            conn = sqlite3.connect(db_path)
-            cursor = conn.cursor()
-
-            # 入力された料理情報をデータベースに保存
-            for entry in st.session_state["ryouri_info_list"]:
-                cursor.execute("""
-                    INSERT INTO ryouri (name, quantity)
-                    VALUES (?, ?)
-                """, (entry["name"], entry["quantity"]))
-            
-            conn.commit()
-            conn.close()
-
-            st.success("データがデータベースに保存されました！")
-
-# データ表示ボタンを追加
+# ── 登録済み料理データ表示ボタン ──
 if st.button('登録された料理データを表示'):
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-
-    # 料理データをSQLクエリで取得
     cursor.execute("SELECT * FROM ryouri")
     ryouri_data = cursor.fetchall()
     if ryouri_data:
         st.write("登録された料理データ:")
-        # データを表示
         ryouri_df = pd.DataFrame(ryouri_data, columns=["ID", "料理名", "個数"])
         st.write(ryouri_df)
     else:
         st.write("登録された料理データはありません。")
-
     conn.close()
